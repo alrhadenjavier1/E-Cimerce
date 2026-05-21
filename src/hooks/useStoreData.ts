@@ -1,80 +1,76 @@
 // src/hooks/useStoreData.ts
 import { useState, useEffect } from 'react';
 import { databaseService } from '../services/databaseService';
-import type { Product, Category, FeatureVideo, SocialLink, FooterLink, HeroContent } from '../utils/storeConfig';
+import type { Product, Category, FeaturedProduct, FeatureVideo, SocialLink, FooterLink, HeroContent } from '../utils/storeConfig';
 
 export const useStoreData = () => {
   const [loading, setLoading] = useState(true);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [bestSellers, setBestSellers] = useState<Product[]>([]);
   const [newArrivals, setNewArrivals] = useState<Product[]>([]);
-  const [featuredProducts, setFeaturedProducts] = useState<any[]>([]);
-  const [featuredVideos, setFeaturedVideos] = useState<FeatureVideo[]>([]);
-  const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
-  const [footerLinks, setFooterLinks] = useState<FooterLink[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [featuredProducts, setFeaturedProducts] = useState<FeaturedProduct[]>([]);
+  const [featureVideos, setFeatureVideos] = useState<FeatureVideo[]>([]);
   const [heroContent, setHeroContent] = useState<HeroContent | null>(null);
+  const [footerLinks, setFooterLinks] = useState<FooterLink[]>([]);
+  const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
   const [storeSettings, setStoreSettings] = useState<any>(null);
 
   useEffect(() => {
-    loadAllData();
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        // Load all data in parallel
+        const [
+          bestSellersData,
+          newArrivalsData,
+          categoriesData,
+          featuredProductsData,
+          featureVideosData,
+          heroContentData,
+          footerLinksData,
+          socialLinksData,
+          storeSettingsData
+        ] = await Promise.all([
+          databaseService.getProducts('bestSellers'),
+          databaseService.getProducts('newArrivals'),
+          databaseService.getCategories(),
+          databaseService.getFeaturedProducts(),
+          databaseService.getFeatureVideos(),
+          databaseService.getHeroContent(),
+          databaseService.getFooterLinks(),
+          databaseService.getSocialLinks(),
+          databaseService.getStoreSettings()
+        ]);
+
+        setBestSellers(bestSellersData);
+        setNewArrivals(newArrivalsData);
+        setCategories(categoriesData);
+        setFeaturedProducts(featuredProductsData);
+        setFeatureVideos(featureVideosData);
+        setHeroContent(heroContentData);
+        setFooterLinks(footerLinksData);
+        setSocialLinks(socialLinksData);
+        setStoreSettings(storeSettingsData);
+      } catch (error) {
+        console.error('Failed to load store data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
-
-  const loadAllData = async () => {
-    setLoading(true);
-    try {
-      const [
-        cats,
-        bestProducts,
-        newProducts,
-        featured,
-        videos,
-        social,
-        footer,
-        hero,
-        settings
-      ] = await Promise.all([
-        databaseService.getCategories(),
-        databaseService.getProducts('bestSellers'),
-        databaseService.getProducts('newArrivals'),
-        databaseService.getFeaturedProducts(),
-        databaseService.getFeatureVideos(),
-        databaseService.getSocialLinks(),
-        databaseService.getFooterLinks(),
-        databaseService.getHeroContent(),
-        databaseService.getStoreSettings(),
-      ]);
-
-      setCategories(cats);
-      setBestSellers(bestProducts);
-      setNewArrivals(newProducts);
-      setFeaturedProducts(featured);
-      setFeaturedVideos(videos);
-      setSocialLinks(social);
-      setFooterLinks(footer);
-      setHeroContent(hero);
-      setStoreSettings(settings);
-    } catch (error) {
-      console.error('Failed to load store data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const reload = () => {
-    loadAllData();
-  };
 
   return {
     loading,
-    categories,
     bestSellers,
     newArrivals,
+    categories,
     featuredProducts,
-    featuredVideos,
-    socialLinks,
-    footerLinks,
+    featureVideos,
     heroContent,
-    storeSettings,
-    reload,
+    footerLinks,
+    socialLinks,
+    storeSettings
   };
 };

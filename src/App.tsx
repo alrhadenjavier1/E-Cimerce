@@ -17,6 +17,9 @@ import { ThemeProvider } from './context/ThemeContext';
 import { CurrencyProvider } from './context/CurrencyContext';
 import { CartProvider } from './context/CartContext';
 import { AdminFeaturedProducts } from './pages/admin/AdminFeaturedProducts';
+import { AdminCategories } from './pages/admin/AdminCategories';
+import { AuthProvider } from './context/AuthContext';
+import { CheckoutPage } from './pages/CheckoutPage';
 
 function App() {
   return (
@@ -26,6 +29,7 @@ function App() {
           <CartProvider>
             <Routes>
               {/* Public Routes */}
+              <Route path="/checkout" element={<CheckoutPage />} />
               <Route path="/" element={<HomePage />} />
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/product/:id" element={<ProductPage />} />
@@ -40,6 +44,7 @@ function App() {
                   <AdminLayout />
                 </AdminRoute>
               }><Route path="videos" element={<AdminFeaturedProducts />} />
+              <Route path="categories" element={<AdminCategories />} />
                 <Route index element={<AdminDashboard />} />
                 <Route path="products" element={<AdminProducts />} />
                 <Route path="settings" element={<AdminSettings />} />

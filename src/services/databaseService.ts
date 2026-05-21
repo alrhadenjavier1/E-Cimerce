@@ -32,6 +32,8 @@ export const databaseService = {
 
   // Products
 // src/services/databaseService.ts - Update getProducts method
+// src/services/databaseService.ts - Fix the getProducts method
+
 async getProducts(section?: 'bestSellers' | 'newArrivals' | 'featured'): Promise<Product[]> {
   try {
     let query = supabase
@@ -40,19 +42,21 @@ async getProducts(section?: 'bestSellers' | 'newArrivals' | 'featured'): Promise
       .eq('enabled', true);
     
     if (section) {
+      // Use the section column from the database
       query = query.eq('section', section);
     }
     
-    const { data, error } = await query;
+    const { data, error } = await query.order('created_at', { ascending: false });
     
     if (error) throw error;
+    
     if (data && data.length > 0) {
       return data.map(item => ({
         id: item.id,
         name: item.name,
         price: item.price,
         originalPrice: item.original_price,
-        rating: item.rating,
+        rating: item.rating || 4.5,
         image: item.image,
         images: item.images || [],
         description: item.description,
@@ -60,17 +64,19 @@ async getProducts(section?: 'bestSellers' | 'newArrivals' | 'featured'): Promise
         isBestSeller: item.is_best_seller,
         isOnSale: item.is_on_sale,
         enabled: item.enabled,
-        category_id: item.category_id, // Add this
+        category_id: item.category_id,
       })) as Product[];
     }
     
-    if (section === 'bestSellers') return storeConfig.bestSellers;
-    if (section === 'newArrivals') return storeConfig.newArrivals;
+    // Only use fallback if no data AND we're not in production
+    if (import.meta.env.DEV && (!data || data.length === 0)) {
+      if (section === 'bestSellers') return storeConfig.bestSellers;
+      if (section === 'newArrivals') return storeConfig.newArrivals;
+    }
+    
     return [];
   } catch (error) {
-    console.error('Failed to fetch products, using fallback:', error);
-    if (section === 'bestSellers') return storeConfig.bestSellers;
-    if (section === 'newArrivals') return storeConfig.newArrivals;
+    console.error('Failed to fetch products:', error);
     return [];
   }
 },
@@ -371,71 +377,70 @@ async getProducts(section?: 'bestSellers' | 'newArrivals' | 'featured'): Promise
   // ========================================
   
     async getCartItems(userId: string) {
-    try {
-        // Set the user ID for RLS
-        await setCurrentUserId(userId);
-        
-        const { data, error } = await supabase
-        .from('cart_items')
-        .select(`
-            *,
-            product:products(*)
-        `)
-        .eq('user_id', userId);
-        
-        if (error) throw error;
-        return data;
-    } catch (error) {
-        console.error('Failed to fetch cart items:', error);
-        return [];
-    }
-    },
+  try {
+    // Remove this line: await setCurrentUserId(userId);
+    
+    const { data, error } = await supabase
+      .from('cart_items')
+      .select(`
+        *,
+        product:products(*)
+      `)
+      .eq('user_id', userId);
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Failed to fetch cart items:', error);
+    return [];
+  }
+},
 
-  async addToCart(userId: string, productId: string, quantity: number = 1, size?: string, color?: string) {
-    try {
-      // Check if item already exists
-      const { data: existing } = await supabase
+ async addToCart(userId: string, productId: string, quantity: number = 1, size?: string, color?: string) {
+  try {
+    // Remove await setCurrentUserId(userId);
+    
+    // Check if item already exists
+    const { data: existing } = await supabase
+      .from('cart_items')
+      .select('id, quantity')
+      .eq('user_id', userId)
+      .eq('product_id', productId)
+      .eq('size', size || null)
+      .eq('color', color || null)
+      .maybeSingle();  // Use maybeSingle instead of single to avoid 406 error
+
+    if (existing) {
+      const { data, error } = await supabase
         .from('cart_items')
-        .select('id, quantity')
-        .eq('user_id', userId)
-        .eq('product_id', productId)
-        .eq('size', size || null)
-        .eq('color', color || null)
+        .update({ quantity: existing.quantity + quantity })
+        .eq('id', existing.id)
+        .select()
         .single();
-
-      if (existing) {
-        // Update quantity
-        const { data, error } = await supabase
-          .from('cart_items')
-          .update({ quantity: existing.quantity + quantity })
-          .eq('id', existing.id)
-          .select()
-          .single();
-        
-        if (error) throw error;
-        return { data, error: null };
-      } else {
-        // Insert new item
-        const { data, error } = await supabase
-          .from('cart_items')
-          .insert({
-            user_id: userId,
-            product_id: productId,
-            quantity,
-            size,
-            color
-          })
-          .select()
-          .single();
-        
-        if (error) throw error;
-        return { data, error: null };
-      }
-    } catch (error) {
-      console.error('Failed to add to cart:', error);
-      return { data: null, error };
+      
+      if (error) throw error;
+      return { data, error: null };
+    } else {
+      const { data, error } = await supabase
+        .from('cart_items')
+        .insert({
+          user_id: userId,
+          product_id: productId,
+          quantity,
+          size,
+          color
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return { data, error: null };
     }
-  },
+  } catch (error) {
+    console.error('Failed to add to cart:', error);
+    return { data: null, error };
+  }
+},
 
   async updateCartItemQuantity(cartItemId: string, quantity: number) {
     try {
